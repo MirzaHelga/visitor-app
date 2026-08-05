@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f5d52">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<title>Buku Tamu Pabrik / Factory Visitor Registration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#12211d;
+    --paper:#f7f5ef;
+    --card:#ffffff;
+    --teal:#0f5d52;
+    --teal-dark:#0a4038;
+    --teal-tint:#e4efec;
+    --amber:#d98e2b;
+    --amber-tint:#fbf0dd;
+    --red:#b3402c;
+    --red-tint:#f8e6e2;
+    --line:#d9d4c7;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Manrope',system-ui,sans-serif;
+    min-height:100vh;
+    min-height:100dvh;
+    -webkit-font-smoothing:antialiased;
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  .wrap{
+    max-width:640px;margin:0 auto;
+    padding:20px 18px calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* On tablet/desktop widths, frame the form as a centered card so it
+     doesn't stretch edge-to-edge like a phone screen */
+  @media (min-width:760px){
+    body{background:linear-gradient(180deg,#eef1ec 0%,var(--paper) 320px);}
+    .wrap{
+      max-width:560px;
+      margin:36px auto 60px;
+      background:var(--card);
+      border:1.5px solid var(--line);
+      border-radius:22px;
+      padding:32px 40px 44px;
+      box-shadow:0 20px 50px -25px rgba(15,93,82,.25);
+    }
+  }
+
+  /* Header */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 18px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .topbar-left{display:flex;align-items:center;gap:10px;min-width:0;}
+
+  /* ---- Hamburger + Sidebar ---- */
+  .hamburger-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:38px;height:38px;flex-shrink:0;
+    background:#fff;border:1.5px solid var(--line);border-radius:9px;cursor:pointer;
+  }
+  .hamburger-btn span{display:block;width:16px;height:2px;background:var(--ink);border-radius:2px;position:relative;}
+  .hamburger-btn span::before,.hamburger-btn span::after{content:"";position:absolute;left:0;width:16px;height:2px;background:var(--ink);border-radius:2px;}
+  .hamburger-btn span::before{top:-5px;}
+  .hamburger-btn span::after{top:5px;}
+
+  .sidebar-overlay{
+    position:fixed;inset:0;background:rgba(18,33,29,.5);z-index:40;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+  }
+  .sidebar-overlay.show{opacity:1;pointer-events:auto;}
+
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:78vw;max-width:280px;
+    background:#fff;z-index:50;box-shadow:20px 0 40px -20px rgba(18,33,29,.35);
+    transform:translateX(-100%);transition:transform .25s ease;
+    padding:20px 18px;padding-top:calc(20px + env(safe-area-inset-top));
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .sidebar.show{transform:translateX(0);}
+  .sidebar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .sidebar-logo{height:28px;width:auto;}
+  .sidebar-close{width:32px;height:32px;border-radius:8px;background:var(--paper);border:1.5px solid var(--line);font-size:16px;line-height:1;cursor:pointer;color:var(--ink);}
+  .sidebar-nav{display:flex;flex-direction:column;gap:6px;}
+  .sidebar-nav a{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;
+    text-decoration:none;color:var(--ink);font-size:14px;font-weight:700;
+  }
+  .sidebar-nav a:hover{background:var(--teal-tint);}
+  .sidebar-nav a.active{background:var(--teal);color:#fff;}
+  .sidebar-nav .ic{width:18px;text-align:center;flex-shrink:0;}
+  .brand-logo{height:34px;width:auto;flex-shrink:0;}
+  .brand-text .sub{font-size:11.5px;color:#5c6b66;letter-spacing:.02em;}
+  .lang-toggle{
+    display:flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;
+    font-family:'Space Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0;
+  }
+  .lang-toggle button{
+    border:none;background:transparent;padding:7px 12px;cursor:pointer;color:#8a8578;letter-spacing:.03em;
+  }
+  .lang-toggle button.active{background:var(--teal);color:#fff;}
+
+  /* Progress */
+  .steps{display:flex;gap:6px;margin-bottom:26px;}
+  .steps .seg{flex:1;height:4px;border-radius:3px;background:var(--line);position:relative;overflow:hidden;}
+  .steps .seg.done, .steps .seg.active{background:var(--teal);}
+  .step-label{font-family:'Space Mono',monospace;font-size:11px;color:#7a7666;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;}
+
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  h1.title{font-size:22px;font-weight:800;letter-spacing:-0.02em;margin:0 0 4px;}
+  p.desc{font-size:14px;color:#5c6b66;margin:0 0 22px;line-height:1.5;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink);}
+  .field .hint{font-size:11.5px;color:#8a8578;margin-top:5px;}
+  input[type=text],input[type=tel],input[type=email],select,textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px 13px;
+    font-family:'Manrope',sans-serif;font-size:15px;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
+  textarea{resize:vertical;min-height:64px;}
+  .req{color:var(--red);}
+
+  /* Health question card */
+  .hq{
+    background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
+    padding:14px 15px;margin-bottom:10px;
+  }
+  .hq .q{font-size:14.5px;font-weight:600;line-height:1.4;margin-bottom:11px;}
+  .hq .opts{display:flex;gap:8px;}
+  .hq .opt{
+    flex:1;text-align:center;padding:10px 8px;border-radius:9px;border:1.5px solid var(--line);
+    font-size:13.5px;font-weight:700;cursor:pointer;background:#fff;color:#7a7666;
+    font-family:'Space Mono',monospace;letter-spacing:.02em;
+  }
+  .hq .opt.selected-no{background:var(--teal-tint);border-color:var(--teal);color:var(--teal-dark);}
+  .hq .opt.selected-yes{background:var(--red-tint);border-color:var(--red);color:var(--red);}
+
+  .health-banner{
+    border-radius:var(--radius);padding:14px 15px;margin:18px 0 4px;font-size:13.5px;font-weight:600;display:none;
+  }
+  .health-banner.show{display:block;}
+  .health-banner.ok{background:var(--teal-tint);color:var(--teal-dark);}
+  .health-banner.warn{background:var(--amber-tint);color:#7a5313;}
+
+  /* GMP checklist */
+  .gmp-list{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
+  .gmp-list ul{margin:0 0 12px;padding-left:18px;font-size:13.5px;line-height:1.7;color:#3a453f;}
+  .checkbox-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;}
+  .checkbox-row input{width:19px;height:19px;margin-top:1px;accent-color:var(--teal);flex-shrink:0;}
+  .checkbox-row span{font-size:13.5px;font-weight:600;line-height:1.45;}
+
+  /* Camera */
+  .cam-box{
+    background:#0e1a17;border-radius:var(--radius);overflow:hidden;position:relative;
+    aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;margin-bottom:14px;
+  }
+  .cam-box video, .cam-box canvas, .cam-box img{width:100%;height:100%;object-fit:cover;display:block;}
+  .cam-box .placeholder{color:#8fa39c;font-size:13px;text-align:center;padding:20px;font-family:'Space Mono',monospace;}
+  .cam-actions{display:flex;gap:10px;}
+
+  button.btn{
+    border:none;border-radius:11px;padding:14px 18px;font-size:14.5px;font-weight:700;
+    cursor:pointer;font-family:'Manrope',sans-serif;letter-spacing:-0.005em;
+  }
+  button.btn-primary{background:var(--teal);color:#fff;width:100%;}
+  button.btn-primary:disabled{background:#b7c4bf;cursor:not-allowed;}
+  button.btn-secondary{background:#fff;color:var(--ink);border:1.5px solid var(--line);flex:1;}
+  button.btn-ghost{background:transparent;color:var(--teal);padding:14px 0;width:100%;}
+
+  .nav-row{display:flex;gap:10px;margin-top:22px;}
+  .nav-row button{flex:1;}
+
+  /* Summary (step 4) */
+  .summary-block{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+  .summary-block h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#8a8578;margin:0 0 10px;font-family:'Space Mono',monospace;}
+  .summary-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:14px;border-bottom:1px solid #f0eee6;}
+  .summary-row:last-child{border-bottom:none;}
+  .summary-row .k{color:#5c6b66;}
+  .summary-row .v{font-weight:700;text-align:right;}
+  .summary-photo{width:84px;height:84px;border-radius:10px;object-fit:cover;float:right;margin-left:12px;}
+
+  /* Success screen */
+  .success-wrap{text-align:center;padding:40px 10px 10px;}
+  .success-icon{
+    width:64px;height:64px;border-radius:50%;background:var(--teal);color:#fff;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:30px;
+  }
+  .pass-card{
+    background:var(--teal-dark);color:#fff;border-radius:18px;padding:22px;margin-top:22px;text-align:left;
+  }
+  .pass-card .pc-label{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.08em;opacity:.65;text-transform:uppercase;}
+  .pass-card .pc-name{font-size:20px;font-weight:800;margin:3px 0 14px;}
+  .pass-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-top:1px solid rgba(255,255,255,.15);}
+  .pass-row .v{font-weight:700;}
+
+  .error-msg{background:var(--red-tint);color:var(--red);border-radius:10px;padding:11px 13px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:none;}
+  .error-msg.show{display:block;}
+
+  [data-lang]{display:none;}
+  html[data-active-lang="id"] [data-lang="id"]{display:inherit;}
+  html[data-active-lang="en"] [data-lang="en"]{display:inherit;}
+  html[data-active-lang="id"] span[data-lang="id"],
+  html[data-active-lang="en"] span[data-lang="en"]{display:inline;}
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <img class="sidebar-logo" src="logo.png" alt="Savoria Kreasi Rasa">
+    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Tutup">✕</button>
+  </div>
+  <div class="sidebar-nav">
+    <a href="index.html" class="active">Form Tamu</a>
+    <a href="admin.html">Admin</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" onclick="openSidebar()" aria-label="Menu"><span></span></button>
+      <div class="brand">
+        <img class="brand-logo" src="logo.png" alt="Savoria Kreasi Rasa">
+        <div class="brand-text">
+          <div class="sub" data-lang="id">Buku Tamu &amp; Skrining Kesehatan</div>
+          <div class="sub" data-lang="en">Visitor Log &amp; Health Screening</div>
+        </div>
+      </div>
+    </div>
+    <div class="lang-toggle">
+      <button id="lang-id" onclick="setLang('id')">ID</button>
+      <button id="lang-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+
+  <div id="form-flow">
+    <div class="steps">
+      <div class="seg" data-seg="1"></div>
+      <div class="seg" data-seg="2"></div>
+      <div class="seg" data-seg="3"></div>
+      <div class="seg" data-seg="4"></div>
+    </div>
+
+    <!-- STEP 1: DATA UMUM -->
+    <section class="panel" id="panel-1">
+      <div class="step-label" data-lang="id">Langkah 1 dari 4</div>
+      <div class="step-label" data-lang="en">Step 1 of 4</div>
+      <h1 class="title" data-lang="id">Data Diri Tamu</h1>
+      <h1 class="title" data-lang="en">Visitor Information</h1>
+      <p class="desc" data-lang="id">Isi data berikut dengan lengkap dan benar sebelum memasuki area pabrik.</p>
+      <p class="desc" data-lang="en">Please fill in the following accurately before entering the factory area.</p>
+
+      <div class="field">
+        <label><span data-lang="id">Nama Lengkap</span><span data-lang="en">Full Name</span> <span class="req">*</span></label>
+        <input type="text" id="f-name" autocomplete="name">
+      </div>
+      <div class="field">
+        <label><span data-lang="id">Perusahaan / Instansi Asal</span><span data-lang="en">Company / Institution</span> <span class="req">*</span></label>
+        <input type="text" id="f-company">
+      </div>
+      <div class="field">
+        <label><span data-lang="id">No. Telepon</span><span data-lang="en">Phone Number</span> <span class="req">*</span></label>
+        <input type="tel" id="f-phone" inputmode="tel">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="f-email">
+      </div>
+      <div class="field">
+        <label><span data-lang="id">Tujuan Kunjungan</span><span data-lang="en">Purpose of Visit</span> <span class="req">*</span></label>
+        <textarea id="f-purpose"></textarea>
+      </div>
+      <div class="field">
+        <label><span data-lang="id">Yang Ditemui / Bagian Dituju</span><span data-lang="en">Person / Department to Visit</span> <span class="req">*</span></label>
+        <input type="text" id="f-host">
+      </div>
+      <div class="field">
+        <label><span data-lang="id">Area Pabrik yang Dikunjungi</span><span data-lang="en">Factory Area to Visit</span></label>
+        <input type="text" id="f-area" placeholder="cth. Produksi, Gudang, Kantor / e.g. Production, Warehouse, Office">
+      </div>
+
+      <div class="error-msg" id="err-1"></div>
+      <div class="nav-row">
+        <button class="btn btn-primary" onclick="goStep(2)"><span data-lang="id">Lanjut</span><span data-lang="en">Continue</span></button>
+      </div>
+    </section>
+
+    <!-- STEP 2: KESEHATAN -->
+    <section class="panel" id="panel-2">
+      <div class="step-label" data-lang="id">Langkah 2 dari 4</div>
+      <div class="step-label" data-lang="en">Step 2 of 4</div>
+      <h1 class="title" data-lang="id">Skrining Kesehatan</h1>
+      <h1 class="title" data-lang="en">Health Screening</h1>
+      <p class="desc" data-lang="id">Sesuai standar keamanan pangan, mohon jawab dengan jujur. Jawaban "Ya" belum tentu menolak kunjungan Anda, namun akan ditinjau oleh petugas.</p>
+      <p class="desc" data-lang="en">In line with food safety standards, please answer honestly. A "Yes" answer does not automatically deny entry, but will be reviewed by staff.</p>
+
+      <div id="health-questions"></div>
+
+      <div class="health-banner" id="health-banner"></div>
+
+      <div class="error-msg" id="err-2"></div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="goStep(1)"><span data-lang="id">Kembali</span><span data-lang="en">Back</span></button>
+        <button class="btn btn-primary" onclick="goStep(3)"><span data-lang="id">Lanjut</span><span data-lang="en">Continue</span></button>
+      </div>
+    </section>
+
+    <!-- STEP 3: FOTO + GMP -->
+    <section class="panel" id="panel-3">
+      <div class="step-label" data-lang="id">Langkah 3 dari 4</div>
+      <div class="step-label" data-lang="en">Step 3 of 4</div>
+      <h1 class="title" data-lang="id">Foto &amp; Kepatuhan GMP</h1>
+      <h1 class="title" data-lang="en">Photo &amp; GMP Compliance</h1>
+      <p class="desc" data-lang="id">Ambil foto wajah untuk kartu tamu Anda.</p>
+      <p class="desc" data-lang="en">Take a face photo for your visitor pass.</p>
+
+      <div class="cam-box" id="cam-box">
+        <div class="placeholder" data-lang="id">Kamera belum aktif</div>
+        <div class="placeholder" data-lang="en">Camera not active</div>
+      </div>
+      <div class="cam-actions">
+        <button class="btn btn-secondary" id="btn-cam-start" onclick="startCamera()"><span data-lang="id">Aktifkan Kamera</span><span data-lang="en">Start Camera</span></button>
+        <button class="btn btn-secondary" id="btn-cam-shot" style="display:none" onclick="takeShot()"><span data-lang="id">Ambil Foto</span><span data-lang="en">Capture</span></button>
+        <button class="btn btn-secondary" id="btn-cam-retake" style="display:none" onclick="retakeShot()"><span data-lang="id">Ambil Ulang</span><span data-lang="en">Retake</span></button>
+      </div>
+
+      <div class="gmp-list" style="margin-top:20px;">
+        <ul>
+          <li data-lang="id">Tidak memakai perhiasan berlebih (cincin/jam boleh, kalung &amp; anting dilepas)</li>
+          <li data-lang="en">No excessive jewelry (rings/watches allowed, remove necklaces &amp; earrings)</li>
+          <li data-lang="id">Kuku bersih dan pendek, tanpa cat kuku</li>
+          <li data-lang="en">Nails clean, short, and free of polish</li>
+          <li data-lang="id">Rambut tertutup penuh (hairnet) saat memasuki area produksi</li>
+          <li data-lang="en">Hair fully covered (hairnet) when entering the production area</li>
+          <li data-lang="id">Tidak memakai parfum menyengat</li>
+          <li data-lang="en">No strong perfume/fragrance</li>
+          <li data-lang="id">Bersedia mengikuti prosedur higiene &amp; keselamatan yang berlaku di pabrik</li>
+          <li data-lang="en">Willing to follow the factory's hygiene &amp; safety procedures</li>
+        </ul>
+        <label class="checkbox-row">
+          <input type="checkbox" id="f-gmp">
+          <span><span data-lang="id">Saya memahami dan bersedia mematuhi ketentuan di atas</span><span data-lang="en">I understand and agree to comply with the above</span></span>
+        </label>
+      </div>
+
+      <div class="error-msg" id="err-3"></div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="goStep(2)"><span data-lang="id">Kembali</span><span data-lang="en">Back</span></button>
+        <button class="btn btn-primary" onclick="goStep(4)"><span data-lang="id">Lanjut</span><span data-lang="en">Continue</span></button>
+      </div>
+    </section>
+
+    <!-- STEP 4: KONFIRMASI -->
+    <section class="panel" id="panel-4">
+      <div class="step-label" data-lang="id">Langkah 4 dari 4</div>
+      <div class="step-label" data-lang="en">Step 4 of 4</div>
+      <h1 class="title" data-lang="id">Konfirmasi Data</h1>
+      <h1 class="title" data-lang="en">Confirm Details</h1>
+      <p class="desc" data-lang="id">Periksa kembali data Anda sebelum mengirim.</p>
+      <p class="desc" data-lang="en">Please review your details before submitting.</p>
+
+      <div class="summary-block">
+        <img class="summary-photo" id="summary-photo" style="display:none">
+        <h3 data-lang="id">Data Diri</h3><h3 data-lang="en">Visitor Info</h3>
+        <div id="summary-general"></div>
+      </div>
+      <div class="summary-block">
+        <h3 data-lang="id">Hasil Skrining Kesehatan</h3><h3 data-lang="en">Health Screening Result</h3>
+        <div id="summary-health"></div>
+      </div>
+
+      <label class="checkbox-row" style="margin:6px 0 18px;">
+        <input type="checkbox" id="f-declare">
+        <span><span data-lang="id">Saya menyatakan bahwa seluruh data di atas benar dan dapat dipertanggungjawabkan.</span><span data-lang="en">I declare that all information above is true and accurate.</span></span>
+      </label>
+
+      <div class="error-msg" id="err-4"></div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="goStep(3)"><span data-lang="id">Kembali</span><span data-lang="en">Back</span></button>
+        <button class="btn btn-primary" id="btn-submit" onclick="submitVisitor()"><span data-lang="id">Kirim &amp; Daftar</span><span data-lang="en">Submit &amp; Register</span></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- SUCCESS SCREEN -->
+  <div class="success-wrap" id="success-screen" style="display:none">
+    <div class="success-icon">✓</div>
+    <h1 class="title" data-lang="id">Pendaftaran Berhasil</h1>
+    <h1 class="title" data-lang="en">Registration Complete</h1>
+    <p class="desc" data-lang="id">Tunjukkan layar ini kepada petugas keamanan.</p>
+    <p class="desc" data-lang="en">Show this screen to security staff.</p>
+
+    <div class="pass-card">
+      <div class="pc-label" data-lang="id">Kartu Tamu</div>
+      <div class="pc-label" data-lang="en">Visitor Pass</div>
+      <div class="pc-name" id="pass-name"></div>
+      <div class="pass-row"><span data-lang="id">Perusahaan</span><span data-lang="en">Company</span><span class="v" id="pass-company"></span></div>
+      <div class="pass-row"><span data-lang="id">Menemui</span><span data-lang="en">Visiting</span><span class="v" id="pass-host"></span></div>
+      <div class="pass-row"><span data-lang="id">Waktu Masuk</span><span data-lang="en">Check-in Time</span><span class="v" id="pass-time"></span></div>
+      <div class="pass-row"><span data-lang="id">Status Kesehatan</span><span data-lang="en">Health Status</span><span class="v" id="pass-health"></span></div>
+    </div>
+
+    <button class="btn btn-ghost" onclick="resetForm()" style="margin-top:24px;">
+      <span data-lang="id">Daftarkan Tamu Baru</span><span data-lang="en">+ Register New Visitor</span>
+    </button>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script>
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+// ---------- SIDEBAR ----------
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('show');
+  document.getElementById('sidebar-overlay').classList.add('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('show');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+// ---------- LANGUAGE ----------
+function setLang(lang){
+  document.documentElement.setAttribute('data-active-lang', lang);
+  document.getElementById('lang-id').classList.toggle('active', lang==='id');
+  document.getElementById('lang-en').classList.toggle('active', lang==='en');
+  localStorage.setItem('visitor_lang', lang);
+  renderHealthQuestions();
+  renderSummary();
+}
+
+// ---------- HEALTH QUESTIONS ----------
+const HEALTH_QUESTIONS = [
+  { key:'health_fever', id:'Demam atau suhu tubuh tinggi dalam 48 jam terakhir?', en:'Fever or high temperature in the last 48 hours?' },
+  { key:'health_diarrhea_vomiting', id:'Diare dan/atau muntah dalam 48 jam terakhir?', en:'Diarrhea and/or vomiting in the last 48 hours?' },
+  { key:'health_cough_cold_fever', id:'Batuk/pilek yang disertai demam?', en:'Cough/cold accompanied by fever?' },
+  { key:'health_skin_wound', id:'Infeksi kulit, bisul, atau luka terbuka yang tidak tertutup rapat?', en:'Skin infection, boils, or open wound not properly covered?' },
+  { key:'health_discharge', id:'Keluar cairan atau nanah dari telinga, mata, atau hidung?', en:'Discharge or pus from ear, eye, or nose?' },
+  { key:'health_jaundice', id:'Sedang mengalami penyakit kuning (jaundice)?', en:'Currently experiencing jaundice?' },
+  { key:'health_contact_infectious', id:'Kontak dengan orang yang menderita penyakit menular dalam 14 hari terakhir?', en:'Contact with someone with an infectious disease in the last 14 days?' },
+];
+const healthAnswers = {};
+
+function renderHealthQuestions(){
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  const wrap = document.getElementById('health-questions');
+  wrap.innerHTML = '';
+  HEALTH_QUESTIONS.forEach(q => {
+    const card = document.createElement('div');
+    card.className = 'hq';
+    const noLabel = lang==='id' ? 'Tidak' : 'No';
+    const yesLabel = lang==='id' ? 'Ya' : 'Yes';
+    card.innerHTML = `
+      <div class="q">${lang==='id' ? q.id : q.en}</div>
+      <div class="opts">
+        <div class="opt" data-val="no" onclick="setHealth('${q.key}', false, this)">${noLabel}</div>
+        <div class="opt" data-val="yes" onclick="setHealth('${q.key}', true, this)">${yesLabel}</div>
+      </div>`;
+    const opts = card.querySelectorAll('.opt');
+    if (healthAnswers[q.key] === false) opts[0].classList.add('selected-no');
+    if (healthAnswers[q.key] === true) opts[1].classList.add('selected-yes');
+    wrap.appendChild(card);
+  });
+  updateHealthBanner();
+}
+
+function setHealth(key, value, el){
+  healthAnswers[key] = value;
+  const opts = el.parentElement.querySelectorAll('.opt');
+  opts.forEach(o => { o.classList.remove('selected-no','selected-yes'); });
+  el.classList.add(value ? 'selected-yes' : 'selected-no');
+  updateHealthBanner();
+}
+
+function isHealthClear(){
+  return HEALTH_QUESTIONS.every(q => healthAnswers[q.key] === false);
+}
+function allHealthAnswered(){
+  return HEALTH_QUESTIONS.every(q => typeof healthAnswers[q.key] === 'boolean');
+}
+
+function updateHealthBanner(){
+  const banner = document.getElementById('health-banner');
+  if (!allHealthAnswered()) { banner.className = 'health-banner'; return; }
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  if (isHealthClear()){
+    banner.className = 'health-banner ok show';
+    banner.textContent = lang==='id'
+      ? 'Tidak ada gejala dilaporkan. Anda dapat melanjutkan.'
+      : 'No symptoms reported. You may proceed.';
+  } else {
+    banner.className = 'health-banner warn show';
+    banner.textContent = lang==='id'
+      ? 'Ada gejala yang dilaporkan. Kunjungan Anda akan ditinjau oleh petugas keamanan/SHE sebelum memasuki area produksi.'
+      : 'Symptoms reported. Your visit will be reviewed by security/SHE staff before entering the production area.';
+  }
+}
+renderHealthQuestions();
+
+// ---------- STEPS ----------
+let currentStep = 1;
+function goStep(n){
+  if (n > currentStep && !validateStep(currentStep)) return;
+  currentStep = n;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+n).classList.add('active');
+  document.querySelectorAll('.seg').forEach((s,i) => {
+    s.classList.toggle('done', i+1 < n);
+    s.classList.toggle('active', i+1 === n);
+  });
+  if (n === 4) renderSummary();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ---------- INIT (runs once everything above is defined) ----------
+setLang(localStorage.getItem('visitor_lang') || 'id');
+goStep(1);
+
+function showErr(step, msgId, msgEn){
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  const el = document.getElementById('err-'+step);
+  el.textContent = lang==='id' ? msgId : msgEn;
+  el.classList.add('show');
+}
+function clearErr(step){ document.getElementById('err-'+step).classList.remove('show'); }
+
+function validateStep(step){
+  clearErr(step);
+  if (step === 1){
+    const required = ['f-name','f-company','f-phone','f-purpose','f-host'];
+    for (const id of required){
+      if (!document.getElementById(id).value.trim()){
+        showErr(1, 'Mohon lengkapi semua kolom bertanda *', 'Please fill in all required fields marked *');
+        return false;
+      }
+    }
+    return true;
+  }
+  if (step === 2){
+    if (!allHealthAnswered()){
+      showErr(2, 'Mohon jawab semua pertanyaan kesehatan', 'Please answer all health questions');
+      return false;
+    }
+    return true;
+  }
+  if (step === 3){
+    if (!capturedPhotoBlob){
+      showErr(3, 'Mohon ambil foto terlebih dahulu', 'Please take a photo first');
+      return false;
+    }
+    if (!document.getElementById('f-gmp').checked){
+      showErr(3, 'Mohon centang persetujuan kepatuhan GMP', 'Please check the GMP compliance agreement');
+      return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+// ---------- CAMERA ----------
+let mediaStream = null;
+let capturedPhotoBlob = null;
+
+async function startCamera(){
+  const camBox = document.getElementById('cam-box');
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    camBox.innerHTML = '<video id="cam-video" autoplay playsinline></video>';
+    document.getElementById('cam-video').srcObject = mediaStream;
+    document.getElementById('btn-cam-start').style.display = 'none';
+    document.getElementById('btn-cam-shot').style.display = 'block';
+  } catch (e) {
+    const lang = document.documentElement.getAttribute('data-active-lang');
+    alert(lang==='id' ? 'Tidak dapat mengakses kamera. Periksa izin kamera pada browser.' : 'Could not access camera. Please check browser camera permissions.');
+  }
+}
+
+function takeShot(){
+  const video = document.getElementById('cam-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    capturedPhotoBlob = blob;
+    const url = URL.createObjectURL(blob);
+    document.getElementById('cam-box').innerHTML = `<img src="${url}">`;
+    document.getElementById('btn-cam-shot').style.display = 'none';
+    document.getElementById('btn-cam-retake').style.display = 'block';
+    if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  }, 'image/jpeg', 0.9);
+}
+
+function retakeShot(){
+  capturedPhotoBlob = null;
+  document.getElementById('btn-cam-retake').style.display = 'none';
+  document.getElementById('btn-cam-start').style.display = 'block';
+  const camBox = document.getElementById('cam-box');
+  camBox.innerHTML = `<div class="placeholder" data-lang="id">Kamera belum aktif</div><div class="placeholder" data-lang="en">Camera not active</div>`;
+}
+
+// ---------- SUMMARY ----------
+function renderSummary(){
+  if (currentStep !== 4) return;
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  const rows = [
+    [lang==='id'?'Nama':'Name', document.getElementById('f-name').value],
+    [lang==='id'?'Perusahaan':'Company', document.getElementById('f-company').value],
+    [lang==='id'?'Telepon':'Phone', document.getElementById('f-phone').value],
+    [lang==='id'?'Tujuan':'Purpose', document.getElementById('f-purpose').value],
+    [lang==='id'?'Ditemui':'Host', document.getElementById('f-host').value],
+  ];
+  document.getElementById('summary-general').innerHTML = rows.map(r =>
+    `<div class="summary-row"><span class="k">${r[0]}</span><span class="v">${escapeHtml(r[1])}</span></div>`
+  ).join('');
+
+  const clear = isHealthClear();
+  document.getElementById('summary-health').innerHTML =
+    `<div class="summary-row"><span class="k">${lang==='id'?'Status':'Status'}</span>
+     <span class="v" style="color:${clear ? '#0f5d52' : '#b3402c'}">
+     ${clear ? (lang==='id'?'Tidak ada gejala':'No symptoms') : (lang==='id'?'Perlu ditinjau':'Needs review')}
+     </span></div>`;
+
+  const photoImg = document.getElementById('summary-photo');
+  if (capturedPhotoBlob){
+    photoImg.src = URL.createObjectURL(capturedPhotoBlob);
+    photoImg.style.display = 'block';
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ---------- SUBMIT ----------
+async function submitVisitor(){
+  clearErr(4);
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  if (!document.getElementById('f-declare').checked){
+    showErr(4, 'Mohon centang pernyataan persetujuan data', 'Please check the data declaration');
+    return;
+  }
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = lang==='id' ? 'Mengirim...' : 'Submitting...';
+
+  try {
+    let photoUrl = null;
+    if (capturedPhotoBlob){
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+      const { data: uploadData, error: uploadErr } = await supabaseClient
+        .storage.from('visitor-photos')
+        .upload(fileName, capturedPhotoBlob, { contentType: 'image/jpeg' });
+      if (uploadErr) throw uploadErr;
+      photoUrl = uploadData.path;
+    }
+
+    const payload = {
+      full_name: document.getElementById('f-name').value.trim(),
+      company: document.getElementById('f-company').value.trim(),
+      phone: document.getElementById('f-phone').value.trim(),
+      email: document.getElementById('f-email').value.trim() || null,
+      purpose: document.getElementById('f-purpose').value.trim(),
+      host_name: document.getElementById('f-host').value.trim(),
+      area_visited: document.getElementById('f-area').value.trim() || null,
+      health_fever: healthAnswers.health_fever,
+      health_diarrhea_vomiting: healthAnswers.health_diarrhea_vomiting,
+      health_cough_cold_fever: healthAnswers.health_cough_cold_fever,
+      health_skin_wound: healthAnswers.health_skin_wound,
+      health_discharge: healthAnswers.health_discharge,
+      health_jaundice: healthAnswers.health_jaundice,
+      health_contact_infectious: healthAnswers.health_contact_infectious,
+      health_clear: isHealthClear(),
+      gmp_compliance_agreed: document.getElementById('f-gmp').checked,
+      declaration_agreed: true,
+      photo_url: photoUrl,
+    };
+
+    const { error } = await supabaseClient.from('visitors').insert(payload);
+    if (error) throw error;
+
+    showSuccess({ ...payload, created_at: new Date().toISOString() });
+  } catch (e) {
+    console.error(e);
+    showErr(4,
+      'Gagal mengirim data: ' + (e.message || 'kesalahan tidak diketahui'),
+      'Failed to submit: ' + (e.message || 'unknown error'));
+    btn.disabled = false;
+    btn.textContent = lang==='id' ? 'Kirim & Daftar' : 'Submit & Register';
+  }
+}
+
+function showSuccess(data){
+  const lang = document.documentElement.getAttribute('data-active-lang');
+  document.getElementById('form-flow').style.display = 'none';
+  document.getElementById('success-screen').style.display = 'block';
+  document.getElementById('pass-name').textContent = data.full_name;
+  document.getElementById('pass-company').textContent = data.company;
+  document.getElementById('pass-host').textContent = data.host_name;
+  document.getElementById('pass-time').textContent = new Date(data.created_at).toLocaleString(lang==='id'?'id-ID':'en-US');
+  document.getElementById('pass-health').textContent = data.health_clear
+    ? (lang==='id' ? 'Baik' : 'Clear')
+    : (lang==='id' ? 'Perlu Ditinjau' : 'Needs Review');
+}
+
+function resetForm(){
+  document.querySelectorAll('#panel-1 input, #panel-1 textarea').forEach(el => el.value = '');
+  Object.keys(healthAnswers).forEach(k => delete healthAnswers[k]);
+  document.getElementById('f-gmp').checked = false;
+  document.getElementById('f-declare').checked = false;
+  capturedPhotoBlob = null;
+  retakeShot();
+  renderHealthQuestions();
+  document.getElementById('form-flow').style.display = 'block';
+  document.getElementById('success-screen').style.display = 'none';
+  goStep(1);
+}
+</script>
+</body>
+</html>

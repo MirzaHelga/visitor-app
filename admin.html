@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="id" data-active-lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f5d52">
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<title>Admin — Buku Tamu Pabrik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#12211d; --paper:#f7f5ef; --card:#ffffff; --teal:#0f5d52; --teal-dark:#0a4038;
+    --teal-tint:#e4efec; --amber-tint:#fbf0dd; --red:#b3402c; --red-tint:#f8e6e2;
+    --line:#d9d4c7; --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Manrope',system-ui,sans-serif;}
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:32px;width:100%;max-width:360px;box-shadow:0 20px 50px -25px rgba(15,93,82,.25);}
+  .login-logo{height:36px;width:auto;margin-bottom:18px;display:block;}
+  .login-card h1{font-size:19px;font-weight:800;margin:0 0 4px;}
+  .login-card p{font-size:13px;color:#5c6b66;margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:6px;}
+  input{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:11px 12px;font-size:14.5px;font-family:'Manrope',sans-serif;}
+  input:focus{outline:2px solid var(--teal);outline-offset:1px;}
+  button{cursor:pointer;font-family:'Manrope',sans-serif;border:none;}
+  .btn-primary{background:var(--teal);color:#fff;border-radius:9px;padding:12px;font-size:14px;font-weight:700;width:100%;}
+  .btn-primary:disabled{background:#b7c4bf;}
+  .err{background:var(--red-tint);color:var(--red);border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:14px;display:none;}
+  .err.show{display:block;}
+
+  #dashboard{display:none;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;
+    background:#fff;border-bottom:1.5px solid var(--line);position:sticky;top:0;z-index:5;
+    padding-left:calc(20px + env(safe-area-inset-left));padding-right:calc(20px + env(safe-area-inset-right));
+    flex-wrap:wrap;
+  }
+  .topbar-brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .topbar-logo{height:28px;width:auto;flex-shrink:0;}
+  .topbar h1{font-size:15px;font-weight:800;margin:0;}
+  .topbar .sub{font-size:11.5px;color:#8a8578;font-family:'Space Mono',monospace;}
+  .logout-btn{background:transparent;color:#8a8578;font-size:13px;font-weight:600;text-decoration:underline;flex-shrink:0;}
+
+  .table-scroll{overflow-x:auto;border-radius:var(--radius);border:1.5px solid var(--line);}
+  .table-scroll table{border:none;border-radius:0;min-width:640px;}
+
+  @media (max-width:600px){
+    .container{padding:16px 14px 50px;}
+    .toolbar{flex-direction:column;align-items:stretch;}
+    .stat{min-width:100px;}
+  }
+
+  .container{max-width:1100px;margin:0 auto;padding:22px 24px 60px;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center;}
+  .toolbar input, .toolbar select{border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:'Manrope',sans-serif;}
+  .toolbar input#search{flex:1;min-width:200px;}
+  .btn-outline{background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;color:var(--ink);}
+  .btn-outline:hover{border-color:var(--teal);color:var(--teal);}
+
+  .stats-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px;}
+  .stat .n{font-size:22px;font-weight:800;font-family:'Space Mono',monospace;}
+  .stat .l{font-size:11px;color:#8a8578;text-transform:uppercase;letter-spacing:.04em;}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--line);}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#8a8578;padding:11px 12px;background:#faf9f5;border-bottom:1.5px solid var(--line);}
+  td{padding:11px 12px;font-size:13.5px;border-bottom:1px solid #f0eee6;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .thumb{width:36px;height:36px;border-radius:8px;object-fit:cover;cursor:pointer;background:#eee;}
+  .badge{padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;font-family:'Space Mono',monospace;}
+  .badge.ok{background:var(--teal-tint);color:var(--teal-dark);}
+  .badge.warn{background:var(--red-tint);color:var(--red);}
+  .empty{text-align:center;color:#8a8578;padding:40px;font-size:13.5px;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(18,33,29,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:20px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;}
+  .modal img{width:100%;border-radius:10px;margin-bottom:14px;}
+  .modal .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0eee6;font-size:13.5px;}
+  .modal .row .k{color:#5c6b66;}
+  .modal .row .v{font-weight:700;text-align:right;max-width:60%;}
+  .modal-close{margin-top:14px;width:100%;background:var(--ink);color:#fff;border-radius:9px;padding:11px;font-weight:700;}
+
+  .btn-danger{background:var(--red-tint);color:var(--red);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;border:1.5px solid transparent;}
+  .btn-danger:hover{border-color:var(--red);}
+  .btn-danger:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-danger-sm{background:var(--red-tint);color:var(--red);border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;}
+  .modal-danger{margin-top:8px;width:100%;background:var(--red-tint);color:var(--red);border-radius:9px;padding:11px;font-weight:700;}
+  th.chk-col, td.chk-col{width:36px;text-align:center;}
+
+  /* ---- Hamburger + Sidebar ---- */
+  .hamburger-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:38px;height:38px;flex-shrink:0;
+    background:#fff;border:1.5px solid var(--line);border-radius:9px;cursor:pointer;
+  }
+  .hamburger-btn span{display:block;width:16px;height:2px;background:var(--ink);border-radius:2px;position:relative;}
+  .hamburger-btn span::before,.hamburger-btn span::after{content:"";position:absolute;left:0;width:16px;height:2px;background:var(--ink);border-radius:2px;}
+  .hamburger-btn span::before{top:-5px;}
+  .hamburger-btn span::after{top:5px;}
+
+  .sidebar-overlay{
+    position:fixed;inset:0;background:rgba(18,33,29,.5);z-index:40;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+  }
+  .sidebar-overlay.show{opacity:1;pointer-events:auto;}
+
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:78vw;max-width:280px;
+    background:#fff;z-index:50;box-shadow:20px 0 40px -20px rgba(18,33,29,.35);
+    transform:translateX(-100%);transition:transform .25s ease;
+    padding:20px 18px;padding-top:calc(20px + env(safe-area-inset-top));
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .sidebar.show{transform:translateX(0);}
+  .sidebar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .sidebar-logo{height:28px;width:auto;}
+  .sidebar-close{width:32px;height:32px;border-radius:8px;background:var(--paper);border:1.5px solid var(--line);font-size:16px;line-height:1;cursor:pointer;color:var(--ink);}
+  .sidebar-nav{display:flex;flex-direction:column;gap:6px;}
+  .sidebar-nav a{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;
+    text-decoration:none;color:var(--ink);font-size:14px;font-weight:700;
+  }
+  .sidebar-nav a:hover{background:var(--teal-tint);}
+  .sidebar-nav a.active{background:var(--teal);color:#fff;}
+  .sidebar-nav .ic{width:18px;text-align:center;flex-shrink:0;}
+  .login-hamburger{
+    position:fixed;top:calc(18px + env(safe-area-inset-top));left:18px;z-index:10;
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <img class="sidebar-logo" src="logo.png" alt="Savoria Kreasi Rasa">
+    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Tutup">✕</button>
+  </div>
+  <div class="sidebar-nav">
+    <a href="index.html">Form Tamu</a>
+    <a href="admin.html" class="active">Admin</a>
+  </div>
+</nav>
+
+<div class="center-screen" id="login-screen">
+  <button class="hamburger-btn login-hamburger" onclick="openSidebar()" aria-label="Menu"><span></span></button>
+  <div class="login-card">
+    <img class="login-logo" src="logo.png" alt="Savoria Kreasi Rasa">
+    <h1>Admin Login</h1>
+    <p>Buku Tamu Pabrik — akses terbatas untuk petugas</p>
+    <div class="err" id="login-err"></div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-pass" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">Masuk</button>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <button class="hamburger-btn" onclick="openSidebar()" aria-label="Menu"><span></span></button>
+      <img class="topbar-logo" src="logo.png" alt="Savoria Kreasi Rasa">
+      <div>
+        <h1>Buku Tamu Pabrik — Admin</h1>
+        <div class="sub" id="user-email"></div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Keluar</button>
+  </div>
+
+  <div class="container">
+    <div class="stats-row">
+      <div class="stat"><div class="n" id="stat-total">–</div><div class="l">Total Tamu</div></div>
+      <div class="stat"><div class="n" id="stat-today">–</div><div class="l">Hari Ini</div></div>
+      <div class="stat"><div class="n" id="stat-review">–</div><div class="l">Perlu Ditinjau</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Cari nama, perusahaan, atau tujuan..." oninput="applyFilter()">
+      <select id="filter-health" onchange="applyFilter()">
+        <option value="all">Semua Status Kesehatan</option>
+        <option value="clear">Baik</option>
+        <option value="review">Perlu Ditinjau</option>
+      </select>
+      <button class="btn-outline" onclick="loadVisitors()">Muat Ulang</button>
+      <button class="btn-outline" onclick="exportExcel()">Export Excel</button>
+      <button class="btn-danger" id="delete-selected-btn" onclick="deleteSelected()" disabled>Hapus Terpilih (<span id="selected-count">0</span>)</button>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="chk-col"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+            <th>Foto</th><th>Nama</th><th>Perusahaan</th><th>Tujuan / Ditemui</th>
+            <th>Waktu Masuk</th><th>Kesehatan</th><th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty-msg" style="display:none;">Belum ada data tamu.</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this) closeModal()">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let allVisitors = [];
+let selectedIds = new Set();
+
+// ---------- SIDEBAR ----------
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('show');
+  document.getElementById('sidebar-overlay').classList.add('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('show');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+// ---------- AUTH ----------
+async function checkSession(){
+  const { data } = await supabaseClient.auth.getSession();
+  if (data.session){
+    showDashboard(data.session.user);
+  }
+}
+checkSession();
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  errEl.classList.remove('show');
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Memproses...';
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Masuk';
+
+  if (error){
+    errEl.textContent = 'Login gagal: ' + error.message;
+    errEl.classList.add('show');
+    return;
+  }
+  showDashboard(data.user);
+}
+
+async function doLogout(){
+  await supabaseClient.auth.signOut();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showDashboard(user){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('user-email').textContent = user.email;
+  loadVisitors();
+}
+
+// ---------- DATA ----------
+async function loadVisitors(){
+  const { data, error } = await supabaseClient
+    .from('visitors')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error){
+    alert('Gagal memuat data: ' + error.message);
+    return;
+  }
+  allVisitors = data;
+  selectedIds.clear();
+  updateSelectedUI();
+
+  // resolve signed URLs for photos
+  for (const v of allVisitors){
+    if (v.photo_url){
+      const { data: signed } = await supabaseClient.storage
+        .from('visitor-photos')
+        .createSignedUrl(v.photo_url, 3600);
+      v._photo_signed_url = signed ? signed.signedUrl : null;
+    }
+  }
+
+  renderStats();
+  applyFilter();
+}
+
+function renderStats(){
+  document.getElementById('stat-total').textContent = allVisitors.length;
+  const today = new Date().toDateString();
+  document.getElementById('stat-today').textContent =
+    allVisitors.filter(v => new Date(v.created_at).toDateString() === today).length;
+  document.getElementById('stat-review').textContent =
+    allVisitors.filter(v => !v.health_clear).length;
+}
+
+function applyFilter(){
+  renderTable(getFilteredRows());
+}
+
+function renderTable(rows){
+  const tbody = document.getElementById('table-body');
+  const emptyMsg = document.getElementById('empty-msg');
+  if (rows.length === 0){
+    tbody.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  tbody.innerHTML = rows.map(v => `
+    <tr>
+      <td class="chk-col"><input type="checkbox" ${selectedIds.has(v.id) ? 'checked' : ''} onchange="toggleRowSelect('${v.id}', this)"></td>
+      <td>${v._photo_signed_url ? `<img class="thumb" src="${v._photo_signed_url}" onclick="openModal('${v.id}')">` : '—'}</td>
+      <td>${escapeHtml(v.full_name)}</td>
+      <td>${escapeHtml(v.company)}</td>
+      <td>${escapeHtml(v.purpose)}<br><span style="color:#8a8578;font-size:12px;">→ ${escapeHtml(v.host_name)}</span></td>
+      <td>${new Date(v.created_at).toLocaleString('id-ID')}</td>
+      <td><span class="badge ${v.health_clear ? 'ok' : 'warn'}">${v.health_clear ? 'Baik' : 'Ditinjau'}</span></td>
+      <td><button class="btn-danger-sm" onclick="deleteVisitor('${v.id}')">Hapus</button></td>
+    </tr>
+  `).join('');
+}
+
+// ---------- SELECTION ----------
+function toggleSelectAll(cb){
+  const rows = getFilteredRows();
+  if (cb.checked) rows.forEach(v => selectedIds.add(v.id));
+  else rows.forEach(v => selectedIds.delete(v.id));
+  updateSelectedUI();
+  applyFilter();
+}
+function toggleRowSelect(id, cb){
+  if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateSelectedUI();
+}
+function updateSelectedUI(){
+  document.getElementById('selected-count').textContent = selectedIds.size;
+  document.getElementById('delete-selected-btn').disabled = selectedIds.size === 0;
+  const selectAll = document.getElementById('select-all');
+  if (selectAll) selectAll.checked = false;
+}
+function getFilteredRows(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const healthFilter = document.getElementById('filter-health').value;
+  return allVisitors.filter(v => {
+    const matchesText = !q || [v.full_name, v.company, v.purpose, v.host_name]
+      .some(f => (f||'').toLowerCase().includes(q));
+    const matchesHealth = healthFilter === 'all'
+      || (healthFilter === 'clear' && v.health_clear)
+      || (healthFilter === 'review' && !v.health_clear);
+    return matchesText && matchesHealth;
+  });
+}
+
+// ---------- DELETE ----------
+async function deleteVisitorIds(ids){
+  if (ids.length === 0) return;
+  // hapus foto di storage dulu (kalau ada)
+  const photoPaths = allVisitors
+    .filter(v => ids.includes(v.id) && v.photo_url)
+    .map(v => v.photo_url);
+  if (photoPaths.length){
+    await supabaseClient.storage.from('visitor-photos').remove(photoPaths);
+  }
+  const { error } = await supabaseClient.from('visitors').delete().in('id', ids);
+  if (error){
+    alert('Gagal menghapus data: ' + error.message);
+    return;
+  }
+  allVisitors = allVisitors.filter(v => !ids.includes(v.id));
+  ids.forEach(id => selectedIds.delete(id));
+  updateSelectedUI();
+  renderStats();
+  applyFilter();
+}
+
+async function deleteVisitor(id){
+  const v = allVisitors.find(x => x.id === id);
+  if (!v) return;
+  if (!confirm(`Hapus data tamu "${v.full_name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+  await deleteVisitorIds([id]);
+}
+
+async function deleteSelected(){
+  if (selectedIds.size === 0) return;
+  if (!confirm(`Hapus ${selectedIds.size} data tamu terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+  await deleteVisitorIds(Array.from(selectedIds));
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// ---------- MODAL ----------
+function openModal(id){
+  const v = allVisitors.find(x => x.id === id);
+  if (!v) return;
+  const healthLabels = {
+    health_fever:'Demam', health_diarrhea_vomiting:'Diare/Muntah', health_cough_cold_fever:'Batuk/Pilek+Demam',
+    health_skin_wound:'Infeksi Kulit/Luka', health_discharge:'Cairan Mata/Telinga/Hidung',
+    health_jaundice:'Penyakit Kuning', health_contact_infectious:'Kontak Penyakit Menular'
+  };
+  const healthRows = Object.keys(healthLabels).map(k =>
+    `<div class="row"><span class="k">${healthLabels[k]}</span><span class="v" style="color:${v[k]?'#b3402c':'#0f5d52'}">${v[k]?'Ya':'Tidak'}</span></div>`
+  ).join('');
+
+  document.getElementById('modal-content').innerHTML = `
+    ${v._photo_signed_url ? `<img src="${v._photo_signed_url}">` : ''}
+    <div class="row"><span class="k">Nama</span><span class="v">${escapeHtml(v.full_name)}</span></div>
+    <div class="row"><span class="k">Perusahaan</span><span class="v">${escapeHtml(v.company)}</span></div>
+    <div class="row"><span class="k">Telepon</span><span class="v">${escapeHtml(v.phone)}</span></div>
+    <div class="row"><span class="k">Email</span><span class="v">${escapeHtml(v.email || '—')}</span></div>
+    <div class="row"><span class="k">Tujuan</span><span class="v">${escapeHtml(v.purpose)}</span></div>
+    <div class="row"><span class="k">Ditemui</span><span class="v">${escapeHtml(v.host_name)}</span></div>
+    <div class="row"><span class="k">Area</span><span class="v">${escapeHtml(v.area_visited || '—')}</span></div>
+    <div class="row"><span class="k">Waktu Masuk</span><span class="v">${new Date(v.created_at).toLocaleString('id-ID')}</span></div>
+    <div class="row"><span class="k">GMP Disetujui</span><span class="v">${v.gmp_compliance_agreed ? 'Ya' : 'Tidak'}</span></div>
+    ${healthRows}
+    <button class="modal-close" onclick="closeModal()">Tutup</button>
+    <button class="modal-danger" onclick="closeModal(); deleteVisitor('${v.id}')">Hapus Data Ini</button>
+  `;
+  document.getElementById('modal-bg').classList.add('show');
+}
+function closeModal(){ document.getElementById('modal-bg').classList.remove('show'); }
+
+// ---------- EXPORT ----------
+function exportExcel(){
+  const rows = getFilteredRows();
+  if (rows.length === 0){ alert('Tidak ada data untuk diexport.'); return; }
+
+  const healthLabels = {
+    health_fever:'Demam', health_diarrhea_vomiting:'Diare/Muntah', health_cough_cold_fever:'Batuk/Pilek+Demam',
+    health_skin_wound:'Infeksi Kulit/Luka', health_discharge:'Cairan Mata/Telinga/Hidung',
+    health_jaundice:'Penyakit Kuning', health_contact_infectious:'Kontak Penyakit Menular'
+  };
+
+  const data = rows.map(v => ({
+    'Waktu Masuk': new Date(v.created_at).toLocaleString('id-ID'),
+    'Nama': v.full_name,
+    'Perusahaan': v.company,
+    'Telepon': v.phone,
+    'Email': v.email || '',
+    'Tujuan': v.purpose,
+    'Ditemui': v.host_name,
+    'Area Dikunjungi': v.area_visited || '',
+    ...Object.fromEntries(Object.entries(healthLabels).map(([k,label]) => [label, v[k] ? 'Ya' : 'Tidak'])),
+    'Status Kesehatan': v.health_clear ? 'Baik' : 'Perlu Ditinjau',
+    'GMP Disetujui': v.gmp_compliance_agreed ? 'Ya' : 'Tidak',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = Object.keys(data[0]).map(k => ({ wch: Math.max(k.length, 14) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Buku Tamu');
+  XLSX.writeFile(wb, `buku-tamu-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+</script>
+</body>
+</html>
