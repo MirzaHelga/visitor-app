@@ -49,6 +49,7 @@ Upload keempat file (`index.html`, `admin.html`, `config.js`, dan folder ini) ke
 
 ## Catatan
 - Foto diambil lewat kamera browser (`getUserMedia`) — perlu HTTPS untuk bekerja (kecuali di `localhost`). Hosting seperti Netlify/Vercel otomatis HTTPS.
+- Foto otomatis di-compress sebelum diupload: di-resize ke maks. 1280px pada sisi terpanjang, lalu kualitas JPEG diturunkan bertahap (mulai 0.85, minimal 0.4) sampai ukuran file ≤ 400KB. Nilai ini bisa diubah lewat `PHOTO_MAX_DIM` dan `PHOTO_TARGET_BYTES` di `index.html`.
 - Pertanyaan kesehatan mengacu pada praktik umum skrining tamu di industri pangan (demam, diare/muntah, infeksi kulit/luka terbuka, keluar cairan dari mata/telinga/hidung, penyakit kuning, kontak penyakit menular). Sesuaikan daftar pertanyaan di `index.html` (variabel `HEALTH_QUESTIONS`) dengan SOP HSE/QA pabrik kamu — daftar ini bukan pengganti kebijakan resmi perusahaan.
 - Jawaban "Ya" pada skrining kesehatan **tidak otomatis memblokir** pendaftaran — sistem hanya menandai status "Perlu Ditinjau" agar petugas keamanan/SHE yang memutuskan.
 - Nama pabrik di header `index.html` masih placeholder ("PT Nama Pabrik Anda") — ganti langsung di HTML.

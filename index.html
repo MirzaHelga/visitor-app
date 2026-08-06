@@ -598,20 +598,55 @@ async function startCamera(){
   }
 }
 
-function takeShot(){
+// Kompresi foto otomatis: resize ke sisi terpanjang maks. PHOTO_MAX_DIM,
+// lalu turunkan kualitas JPEG bertahap sampai ukuran file <= PHOTO_TARGET_BYTES.
+const PHOTO_MAX_DIM = 1280;          // px, sisi terpanjang
+const PHOTO_TARGET_BYTES = 400 * 1024; // 400KB
+const PHOTO_MIN_QUALITY = 0.4;
+
+function canvasToBlob(canvas, quality){
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
+
+async function compressPhoto(sourceCanvas){
+  let width = sourceCanvas.width;
+  let height = sourceCanvas.height;
+  const longest = Math.max(width, height);
+  if (longest > PHOTO_MAX_DIM){
+    const scale = PHOTO_MAX_DIM / longest;
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  const resized = document.createElement('canvas');
+  resized.width = width;
+  resized.height = height;
+  resized.getContext('2d').drawImage(sourceCanvas, 0, 0, width, height);
+
+  let quality = 0.85;
+  let blob = await canvasToBlob(resized, quality);
+  while (blob.size > PHOTO_TARGET_BYTES && quality > PHOTO_MIN_QUALITY){
+    quality = Math.max(PHOTO_MIN_QUALITY, quality - 0.1);
+    blob = await canvasToBlob(resized, quality);
+    if (quality === PHOTO_MIN_QUALITY) break;
+  }
+  return blob;
+}
+
+async function takeShot(){
   const video = document.getElementById('cam-video');
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  canvas.toBlob(blob => {
-    capturedPhotoBlob = blob;
-    const url = URL.createObjectURL(blob);
-    document.getElementById('cam-box').innerHTML = `<img src="${url}">`;
-    document.getElementById('btn-cam-shot').style.display = 'none';
-    document.getElementById('btn-cam-retake').style.display = 'block';
-    if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
-  }, 'image/jpeg', 0.9);
+
+  const blob = await compressPhoto(canvas);
+  capturedPhotoBlob = blob;
+  const url = URL.createObjectURL(blob);
+  document.getElementById('cam-box').innerHTML = `<img src="${url}">`;
+  document.getElementById('btn-cam-shot').style.display = 'none';
+  document.getElementById('btn-cam-retake').style.display = 'block';
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
 }
 
 function retakeShot(){
