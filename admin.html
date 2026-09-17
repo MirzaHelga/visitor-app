@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   :root{
     --ink:#12211d; --paper:#f7f5ef; --card:#ffffff; --teal:#0f5d52; --teal-dark:#0a4038;
@@ -197,6 +198,7 @@
       </select>
       <button class="btn-outline" onclick="loadVisitors()">Muat Ulang</button>
       <button class="btn-outline" onclick="exportExcel()">Export Excel</button>
+      <button class="btn-outline" id="download-photos-btn" onclick="downloadSelectedPhotos()" disabled>Simpan Foto Terpilih (<span id="selected-count-photo">0</span>)</button>
       <button class="btn-danger" id="delete-selected-btn" onclick="deleteSelected()" disabled>Hapus Terpilih (<span id="selected-count">0</span>)</button>
     </div>
 
@@ -205,7 +207,7 @@
         <thead>
           <tr>
             <th class="chk-col"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
-            <th>Foto</th><th>Nama</th><th>Perusahaan</th><th>Tujuan / Ditemui</th>
+            <th>Foto</th><th>ID</th><th>Nama</th><th>Perusahaan</th><th>Tujuan / Ditemui</th>
             <th>Waktu Masuk</th><th>Kesehatan</th><th>Aksi</th>
           </tr>
         </thead>
@@ -332,6 +334,7 @@ function renderTable(rows){
     <tr>
       <td class="chk-col"><input type="checkbox" ${selectedIds.has(v.id) ? 'checked' : ''} onchange="toggleRowSelect('${v.id}', this)"></td>
       <td>${v._photo_signed_url ? `<img class="thumb" src="${v._photo_signed_url}" onclick="openModal('${v.id}')">` : '—'}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:12.5px;">${escapeHtml(v.visitor_id || '—')}</td>
       <td>${escapeHtml(v.full_name)}</td>
       <td>${escapeHtml(v.company)}</td>
       <td>${escapeHtml(v.purpose)}<br><span style="color:#8a8578;font-size:12px;">→ ${escapeHtml(v.host_name)}</span></td>
@@ -356,7 +359,9 @@ function toggleRowSelect(id, cb){
 }
 function updateSelectedUI(){
   document.getElementById('selected-count').textContent = selectedIds.size;
+  document.getElementById('selected-count-photo').textContent = selectedIds.size;
   document.getElementById('delete-selected-btn').disabled = selectedIds.size === 0;
+  document.getElementById('download-photos-btn').disabled = selectedIds.size === 0;
   const selectAll = document.getElementById('select-all');
   if (selectAll) selectAll.checked = false;
 }
@@ -429,6 +434,7 @@ function openModal(id){
 
   document.getElementById('modal-content').innerHTML = `
     ${v._photo_signed_url ? `<img src="${v._photo_signed_url}">` : ''}
+    <div class="row"><span class="k">ID Tamu</span><span class="v" style="font-family:'Space Mono',monospace;">${escapeHtml(v.visitor_id || '—')}</span></div>
     <div class="row"><span class="k">Nama</span><span class="v">${escapeHtml(v.full_name)}</span></div>
     <div class="row"><span class="k">Perusahaan</span><span class="v">${escapeHtml(v.company)}</span></div>
     <div class="row"><span class="k">Telepon</span><span class="v">${escapeHtml(v.phone)}</span></div>
@@ -446,6 +452,96 @@ function openModal(id){
 }
 function closeModal(){ document.getElementById('modal-bg').classList.remove('show'); }
 
+// ---------- SIMPAN FOTO (ZIP) ----------
+// Nama tiap file foto: {ID}_{Nama}.jpg — mis. 36000001_Budi Santoso.jpg
+// Semua foto terpilih dibungkus jadi satu file .zip; saat diekstrak jadi
+// satu folder berisi foto-foto tsb. Nama file .zip (= nama folder) bisa
+// diisi sendiri lewat prompt di bawah.
+function sanitizeFileName(s){
+  return (s || 'tanpa-nama')
+    .normalize('NFKD')
+    .replace(/[\\/:*?"<>|]/g, '')   // karakter terlarang di nama file
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function downloadSelectedPhotos(){
+  if (selectedIds.size === 0) return;
+
+  const selected = allVisitors.filter(v => selectedIds.has(v.id));
+  const withPhoto = selected.filter(v => v.photo_url);
+
+  if (withPhoto.length === 0){
+    alert('Tidak ada foto pada data yang dipilih.');
+    return;
+  }
+
+  const defaultName = `foto-tamu-${new Date().toISOString().slice(0,10)}`;
+  const folderName = prompt('Nama folder/file ZIP:', defaultName);
+  if (folderName === null) return; // batal
+  const zipName = sanitizeFileName(folderName) || defaultName;
+
+  const btn = document.getElementById('download-photos-btn');
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+
+  try {
+    const zip = new JSZip();
+    const usedNames = new Set();
+    let done = 0;
+
+    for (const v of withPhoto){
+      btn.textContent = `Menyiapkan foto... (${++done}/${withPhoto.length})`;
+
+      // pakai signed URL yang masih berlaku, atau generate ulang kalau perlu
+      let url = v._photo_signed_url;
+      if (!url){
+        const { data: signed } = await supabaseClient.storage
+          .from('visitor-photos')
+          .createSignedUrl(v.photo_url, 3600);
+        url = signed ? signed.signedUrl : null;
+      }
+      if (!url) continue;
+
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+
+      let baseName = `${v.visitor_id || v.id.slice(0,8)}_${sanitizeFileName(v.full_name)}`;
+      let fileName = `${baseName}.jpg`;
+      let n = 2;
+      while (usedNames.has(fileName)){
+        fileName = `${baseName} (${n}).jpg`;
+        n++;
+      }
+      usedNames.add(fileName);
+
+      zip.file(fileName, blob);
+    }
+
+    if (Object.keys(zip.files).length === 0){
+      alert('Gagal mengambil foto — coba klik "Muat Ulang" lalu coba lagi.');
+      return;
+    }
+
+    btn.textContent = 'Membuat ZIP...';
+    const content = await zip.generateAsync({ type: 'blob' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(content);
+    link.download = `${zipName}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  } catch (e){
+    console.error(e);
+    alert('Gagal menyimpan foto: ' + (e.message || 'kesalahan tidak diketahui'));
+  } finally {
+    btn.disabled = selectedIds.size === 0;
+    btn.innerHTML = originalLabel;
+  }
+}
+
 // ---------- EXPORT ----------
 function exportExcel(){
   const rows = getFilteredRows();
@@ -458,6 +554,7 @@ function exportExcel(){
   };
 
   const data = rows.map(v => ({
+    'ID Tamu': v.visitor_id || '',
     'Waktu Masuk': new Date(v.created_at).toLocaleString('id-ID'),
     'Nama': v.full_name,
     'Perusahaan': v.company,

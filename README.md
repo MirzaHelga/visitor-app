@@ -47,6 +47,19 @@ Upload keempat file (`index.html`, `admin.html`, `config.js`, dan folder ini) ke
 - **Kiosk/tablet di pintu masuk pabrik**: buka `index.html` di browser, mode kiosk/fullscreen
 - **Admin**: buka `admin.html` di komputer/HP petugas (login diperlukan)
 
+## ID Tamu Otomatis
+Setiap tamu yang mendaftar otomatis dapat **ID unik berformat `36XXXXXX`** (mis. `36000001`, `36000002`, ...), dibuat oleh database (Postgres sequence) supaya tidak pernah bentrok walau banyak tamu mendaftar bersamaan. ID ini muncul di kartu tamu (layar sukses setelah submit) dan di kolom **ID** pada dashboard admin.
+- Kalau kamu baru pertama kali setup, cukup jalankan `schema.sql` seperti biasa.
+- Kalau tabel `visitors` **sudah ada** dari sebelumnya (belum ada kolom ID), jalankan ulang `schema.sql` — baris-baris lama akan otomatis diberi ID urut berdasarkan tanggal daftar (`created_at`).
+- Format `36` di depan cuma prefix tetap; 6 digit di belakangnya yang naik otomatis. Mau ganti prefix (misalnya jadi `20` atau kode pabrikmu), tinggal ganti `'36'` di `schema.sql` (ada di 2 tempat: bagian backfill & bagian default kolom).
+
+## Simpan Foto Tamu (bulk, ke ZIP)
+Di dashboard admin, centang tamu yang fotonya mau disimpan (bisa banyak sekaligus, atau centang "select all" di header tabel), lalu klik **"Simpan Foto Terpilih"**.
+- Semua foto yang dicentang dibungkus jadi satu file **.zip** — begitu diekstrak, isinya jadi satu folder berisi foto-foto tersebut.
+- Nama tiap file foto otomatis: **`ID_Nama.jpg`** (mis. `36000001_Budi Santoso.jpg`).
+- Nama file .zip (= nama folder setelah diekstrak) bisa kamu isi sendiri lewat kotak dialog yang muncul; kalau dikosongkan, dipakai nama default `foto-tamu-YYYY-MM-DD`.
+- Tamu yang dicentang tapi tidak punya foto otomatis dilewati.
+
 ## Catatan
 - Foto diambil lewat kamera browser (`getUserMedia`) — perlu HTTPS untuk bekerja (kecuali di `localhost`). Hosting seperti Netlify/Vercel otomatis HTTPS.
 - Foto otomatis di-compress sebelum diupload: di-resize ke maks. 1280px pada sisi terpanjang, lalu kualitas JPEG diturunkan bertahap (mulai 0.85, minimal 0.4) sampai ukuran file ≤ 400KB. Nilai ini bisa diubah lewat `PHOTO_MAX_DIM` dan `PHOTO_TARGET_BYTES` di `index.html`.

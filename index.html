@@ -206,6 +206,7 @@
   }
   .pass-card .pc-label{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.08em;opacity:.65;text-transform:uppercase;}
   .pass-card .pc-name{font-size:20px;font-weight:800;margin:3px 0 14px;}
+  .pass-card .pc-id{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;letter-spacing:.04em;background:rgba(255,255,255,.14);display:inline-block;padding:4px 10px;border-radius:7px;margin:6px 0 14px;}
   .pass-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-top:1px solid rgba(255,255,255,.15);}
   .pass-row .v{font-weight:700;}
 
@@ -413,6 +414,7 @@
       <div class="pc-label" data-lang="id">Kartu Tamu</div>
       <div class="pc-label" data-lang="en">Visitor Pass</div>
       <div class="pc-name" id="pass-name"></div>
+      <div class="pc-id" id="pass-id"></div>
       <div class="pass-row"><span data-lang="id">Perusahaan</span><span data-lang="en">Company</span><span class="v" id="pass-company"></span></div>
       <div class="pass-row"><span data-lang="id">Menemui</span><span data-lang="en">Visiting</span><span class="v" id="pass-host"></span></div>
       <div class="pass-row"><span data-lang="id">Waktu Masuk</span><span data-lang="en">Check-in Time</span><span class="v" id="pass-time"></span></div>
@@ -736,10 +738,12 @@ async function submitVisitor(){
       photo_url: photoUrl,
     };
 
-    const { error } = await supabaseClient.from('visitors').insert(payload);
+    const { data: inserted, error } = await supabaseClient
+    .rpc('submit_visitor', { payload })
+    .single();
     if (error) throw error;
 
-    showSuccess({ ...payload, created_at: new Date().toISOString() });
+    showSuccess({ ...payload, ...inserted });
   } catch (e) {
     console.error(e);
     showErr(4,
@@ -755,6 +759,7 @@ function showSuccess(data){
   document.getElementById('form-flow').style.display = 'none';
   document.getElementById('success-screen').style.display = 'block';
   document.getElementById('pass-name').textContent = data.full_name;
+  document.getElementById('pass-id').textContent = data.visitor_id || '—';
   document.getElementById('pass-company').textContent = data.company;
   document.getElementById('pass-host').textContent = data.host_name;
   document.getElementById('pass-time').textContent = new Date(data.created_at).toLocaleString(lang==='id'?'id-ID':'en-US');
